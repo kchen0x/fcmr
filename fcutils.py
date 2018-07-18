@@ -1,5 +1,6 @@
 import os
 
+
 def compute_batch_size(keys, memory, concurrency):
     max_mem_for_data = 0.6 * memory * 1000 * 1000
     size = 1.0
@@ -16,20 +17,22 @@ def compute_batch_size(keys, memory, concurrency):
         bsize = int(round(max_mem_for_data / avg_object_size))
     return bsize
 
+
 def batch_creator(keys, batch_size):
     batches = []
     batch = []
     for i in range(len(keys)):
         batch.append(keys[i])
-        if (len(batch) >= batch_size):
+        if len(batch) >= batch_size:
             batches.append(batch)
             batch = []
     if len(batch):
         batches.append(batch)
     return batches
 
+
 class FuncManager(object):
-    def __init__(self, func, oss, region, codepath, job_id, fname, handler, funcmem= 3072):
+    def __init__(self, func, oss, region, codepath, job_id, fname, handler, funcmem=3072):
         self.func = func
         self.region = 'cn-hangzhou' if region is None else region
         self.oss = oss
@@ -40,14 +43,14 @@ class FuncManager(object):
         self.role = os.environ.get('MRTEST_ROLE')
         self.memory = funcmem
         self.timeout = 300
-        self.func_arn = None # set after creation
+        self.func_arn = None  # set after creation
 
     def create_function(self):
         pass
 
     def update_function(self):
         pass
-    
+
     def update_code_or_create_on_noexist(self):
         pass
 
