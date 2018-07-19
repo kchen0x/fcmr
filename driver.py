@@ -9,6 +9,8 @@ import oss2
 import subprocess
 import glob
 import time
+from multiprocessing.dummy import Pool as ThreadPool
+from functools import partial
 from aliyunsdkcore import client
 from aliyunsdkram.request.v20150501 import CreateRoleRequest
 from aliyunsdkram.request.v20150501 import AttachPolicyToRoleRequest
@@ -24,14 +26,14 @@ JOB_INFO = 'jobinfo.json'
 def write_job_config(job_id, job_bucket, n_mappers, r_func, r_handler):
     fname = "jobinfo.json"
     with open(fname, 'w') as f:
-        data = json.dumps({
+        req_data = json.dumps({
             "jobId": job_id,
             "jobBucket": job_bucket,
             "mapCount": n_mappers,
             "reducerFunction": r_func,
             "reducerHandler": r_handler
         }, indent=4)
-        f.write(data)
+        f.write(req_data)
 
 
 def zip_func(fname, zipname):
@@ -177,4 +179,115 @@ write_to_oss(job_bucket, j_key, data)
 
 mapper_outputs = []
 
+
 ## INVOKE MAPPERS
+def invoke_function(batches, m_id):
+    """
+
+    :param batches:
+    :param m_id:
+    :return:
+    """
+
+    batch = [k.key for k in batches[m_id - 1]]
+    resp = mapper.client.invoke_function(mapper.service_name, mapper.func_name, payload=json.dumps({
+        "sourceBucket": source_bucket_name,
+        "keys": batch,
+        "jobBucket": job_bucket_name,
+        "jobId": job_id,
+        "mapperId": m_id
+    }))
+
+    out = resp.data
+    mapper_outputs.append(out)
+    print('\tmapper {0} output: {1}'.format(m_id, out))
+
+
+# execute parallel
+print('{0} Mappers in total'.format(n_mappers))
+pool = ThreadPool(n_mappers)
+ids = [i + 1 for i in range(n_mappers)]
+invoke_func_partial = partial(invoke_function, batches)
+
+# burst request handling
+mappers_executed = 0
+while mappers_executed < n_mappers:
+    nm = min(concurrent_funcs, n_mappers)
+    results = pool.map(invoke_func_partial,
+                       ids[mappers_executed:mappers_executed + nm])
+    mappers_executed += nm
+
+pool.close()
+pool.join()
+
+print('All the mappers finished.')
+
+# delete mapper function
+mapper.delete_function()
+
+# calculate costs - approx (since we are using exec time reported by out function
+# and not billed ms)
+total_func_secs = 0
+total_oss_get_ops = 0
+total_oss_put_ops = 0
+oss_storage_hours = 0
+total_lines = 0
+
+for output in mapper_outputs:
+    total_oss_get_ops += int(output[0])
+    total_lines += int(output[1])
+    total_func_secs += float(output[2])
+
+# NOTE: Wait for the job to complete so that we can compute total cost;
+# create poll every 10 secs
+
+# get all reducer keys
+reducer_keys = []
+
+# total execution time for reducers
+reducer_func_time = 0
+
+while True:
+    job_keys = job_bucket.list_objects(prefix=job_id)
+    keys = [jk['Key'] for jk in job_keys]
+    total_oss_size = sum([jk['Size'] for jk in job_keys])
+
+    print('Check to see if the job is done ...')
+
+    # check job done
+    if job_id + '/result' in keys:
+        print('Job done.')
+        # TODO do real calculation
+        print job_bucket.get_object_meta(job_id + '/result').resp
+        for key in keys:
+            if 'task/reducer' in key:
+                # TODO do real calculation
+                reducer_keys.append(key)
+        break
+    time.sleep(5)
+
+# OSS Storage cost - Account for mappers only;
+oss_storage_hours_cost = 1 * 0.0000521 * (total_oss_size/1024.0/1024.0/1024.0)
+oss_put_cost = len(job_keys) * 0.005 / 1000
+
+# OSS GET # $0.004/10000
+total_oss_get_ops += len(job_keys)
+oss_get_cost = total_oss_get_ops * 0.004/10000
+
+# Total FC function costs
+total_func_secs += reducer_func_time
+func_cost = total_func_secs * 0.00001667 * func_memory / 1024.0
+oss_cost = oss_get_cost + oss_put_cost + oss_storage_hours_cost
+
+# Print costs
+print "Reducer FC", reducer_func_time * 0.00001667 * func_memory / 1024.0
+print "Lambda Cost", func_cost
+print "OSS Storage Cost", oss_storage_hours_cost
+print "OSS Request Cost", oss_get_cost + oss_put_cost
+print "OSS Cost", oss_cost
+print "Total Cost: ", func_cost + oss_cost
+print "Total Lines:", total_lines
+
+# Delete Reducer function
+reducer.delete_function()
+coordinator.delete_function()
