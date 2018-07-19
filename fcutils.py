@@ -80,12 +80,20 @@ class FuncManager(object):
         pass
 
     def create_oss_eventsource_trigger(self, trigger_name, bucket, user_id, prefix=None):
+        oss_trigger_config = {
+            'event': ['oss:ObjectCreated:*'],
+            'filter': {
+                'key': {
+                    'prefix': prefix,
+                }
+            }
+        }
         self.client.create_trigger(self.service_name,
                                    self.func_name,
                                    trigger_name,
                                    'oss',
                                    # TODO make sure of trigger config
-                                   '',
+                                   oss_trigger_config,
                                    'acs:oss::%s:%s:%s' % (self.region, user_id, bucket),
                                    self.role)
 
