@@ -52,6 +52,7 @@ class FuncManager(object):
         # self.func_arn = None  # set after creation
 
     def create_function(self):
+        print('Creating function: {0}.{1} ...'.format(self.service_name, self.func_name))
         self.client.create_function(self.service_name,
                                     self.func_name,
                                     self.runtime,
@@ -61,6 +62,7 @@ class FuncManager(object):
                                     timeout=self.timeout)
 
     def update_function(self):
+        print('Updating function: {0}.{1} ...'.format(self.service_name, self.func_name))
         self.client.update_function(self.service_name,
                                     self.func_name,
                                     codeZipFile=self.codepath,
@@ -80,8 +82,9 @@ class FuncManager(object):
         pass
 
     def create_oss_eventsource_trigger(self, trigger_name, bucket, user_id, prefix=None):
+        print('Creating oss event source trigger ...')
         oss_trigger_config = {
-            'event': ['oss:ObjectCreated:*'],
+            'events': ['oss:ObjectCreated:*'],
             'filter': {
                 'key': {
                     'prefix': prefix,
@@ -94,7 +97,7 @@ class FuncManager(object):
                                    'oss',
                                    # TODO make sure of trigger config
                                    oss_trigger_config,
-                                   'acs:oss::%s:%s:%s' % (self.region, user_id, bucket),
+                                   'acs:oss:%s:%s:%s' % (self.region, user_id, bucket),
                                    self.role)
 
     def delete_function(self):
