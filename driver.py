@@ -23,13 +23,14 @@ JOB_INFO = 'jobinfo.json'
 
 
 ## UTILS ##
-def write_job_config(job_id, job_bucket, n_mappers, r_func, r_handler):
+def write_job_config(job_id, job_bucket, n_mappers, service_name, r_func, r_handler):
     fname = "jobinfo.json"
     with open(fname, 'w') as f:
         req_data = json.dumps({
             "jobId": job_id,
             "jobBucket": job_bucket,
             "mapCount": n_mappers,
+            "serviceName": service_name,
             "reducerFunction": r_func,
             "reducerHandler": r_handler
         }, indent=4)
@@ -103,10 +104,12 @@ if role_name not in role_list:
     response = acs_client.do_action_with_exception(policy_request)
     policy_request.set_PolicyName('AliyunFCFullAccess')
     response = acs_client.do_action_with_exception(policy_request)
+    policy_request.set_PolicyName('AliyunLogFullAccess')
+    response = acs_client.do_action_with_exception(policy_request)
 
 # create fc client
 print('Creating FC client ...')
-fc_endpoint = 'https://%s.%s.fc.aliyuncs.com' % (user_id, region)
+fc_endpoint = 'http://%s.%s.fc.aliyuncs.com' % (user_id, region)
 fc_client = fc2.Client(
     endpoint=fc_endpoint,
     accessKeyID=access_key_id,
@@ -138,7 +141,7 @@ reducer_name = 'reducer-' + job_id
 coordinator_name = 'coordinator-' + job_id
 
 # write job config
-write_job_config(job_id, job_bucket_name, n_mappers, reducer_name, config['reducer']['handler'])
+write_job_config(job_id, job_bucket_name, n_mappers, service_name, reducer_name, config['reducer']['handler'])
 
 zip_func(config['mapper']['name'], config['mapper']['zip'])
 zip_func(config['reducer']['name'], config['reducer']['zip'])
@@ -234,6 +237,7 @@ oss_storage_hours = 0
 total_lines = 0
 
 for output in mapper_outputs:
+    output = json.loads(output)
     total_oss_get_ops += int(output[0])
     total_lines += int(output[1])
     total_func_secs += float(output[2])
@@ -248,9 +252,9 @@ reducer_keys = []
 reducer_func_time = 0
 
 while True:
-    job_keys = job_bucket.list_objects(prefix=job_id)
-    keys = [jk['Key'] for jk in job_keys]
-    total_oss_size = sum([jk['Size'] for jk in job_keys])
+    job_keys = job_bucket.list_objects(prefix=job_id).object_list
+    keys = [jk.key for jk in job_keys]
+    total_oss_size = sum([jk.size for jk in job_keys])
 
     print('Check to see if the job is done ...')
 
@@ -291,3 +295,4 @@ print "Total Lines:", total_lines
 # Delete Reducer function
 reducer.delete_function()
 coordinator.delete_function()
+# Todo: delete service
