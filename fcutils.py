@@ -83,22 +83,24 @@ class FuncManager(object):
 
     def create_oss_eventsource_trigger(self, trigger_name, bucket, user_id, prefix=None):
         print('Creating oss event source trigger ...')
-        oss_trigger_config = {
-            'events': ['oss:ObjectCreated:*'],
-            'filter': {
-                'key': {
-                    'prefix': prefix,
+        response = self.client.list_triggers(self.service_name, self.func_name)
+        if len(response.data['triggers']) is 0:
+            oss_trigger_config = {
+                'events': ['oss:ObjectCreated:*'],
+                'filter': {
+                    'key': {
+                        'prefix': prefix,
+                    }
                 }
             }
-        }
-        self.client.create_trigger(self.service_name,
-                                   self.func_name,
-                                   trigger_name,
-                                   'oss',
-                                   # TODO make sure of trigger config
-                                   oss_trigger_config,
-                                   'acs:oss:%s:%s:%s' % (self.region, user_id, bucket),
-                                   self.role)
+            self.client.create_trigger(self.service_name,
+                                       self.func_name,
+                                       trigger_name,
+                                       'oss',
+                                       # TODO make sure of trigger config
+                                       oss_trigger_config,
+                                       'acs:oss:%s:%s:%s' % (self.region, user_id, bucket),
+                                       self.role)
 
     def delete_function(self):
         self.client.delete_function(self.service_name, self.func_name)
