@@ -53,8 +53,8 @@ def handler(event, context):
     # totalProcessingTime = 0
     pret = [len(src_keys), line_count, time_in_secs, err]
     metadata = {
-        "lineCount": line_count,
-        "processingTime": time_in_secs
+        "lineCount": str(line_count),
+        "processingTime": str(time_in_secs)
     }
     mapper_fname = "%s/%s%s" % (job_id, TASK_MAPPER_PREFIX, mapper_id)
 
