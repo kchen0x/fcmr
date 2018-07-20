@@ -5,7 +5,8 @@
       "Effect": "Allow",
       "Principal": {
         "Service": [
-          "fc.aliyuncs.com"
+          "fc.aliyuncs.com",
+          "oss.aliyuncs.com"
         ]
       }
     }
