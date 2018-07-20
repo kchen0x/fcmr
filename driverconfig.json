@@ -1,0 +1,29 @@
+{
+    "serviceName": "fcMapReduce",
+    "jobId": "mrtest",
+    "userId": "<your_user_id>",
+    "roleName": "fcmr",
+    "accessKeyId": "<your_ak_id>",
+    "accessKeySecret": "<your_ak_secret>",
+    "region": "cn-hangzhou",
+    "sourceBucket": "mrtest-data",
+    "prefix": "test-data",
+    "jobBucket": "mrtest-kchen-job",
+    "concurrentFuncs": 100,
+    "funcMemory": 3072,
+    "mapper": {
+        "name": "mapper.py",
+        "handler": "mapper.handler",
+        "zip": "mapper.zip"
+    },
+    "reducer": {
+        "name": "reducer.py",
+        "handler": "reducer.handler",
+        "zip": "reducer.zip"
+    },
+    "coordinator": {
+        "name": "coordinator.py",
+        "handler": "coordinator.handler",
+        "zip": "coordinator.zip"
+    }
+}
